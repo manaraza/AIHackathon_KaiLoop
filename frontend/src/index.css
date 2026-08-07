@@ -169,3 +169,23 @@ button:disabled {
 .flagged-row {
   background: #fff3f3;
 }
+
+.stack-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.field-label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.85rem;
+  color: #555;
+  margin-bottom: 0.75rem;
+}
+
+.stack-form button {
+  align-self: flex-start;
+  margin-top: 0.5rem;
+}

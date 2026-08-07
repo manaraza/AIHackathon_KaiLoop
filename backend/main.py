@@ -1,11 +1,17 @@
 """
-Kai Loop — SecondCrop backend.
+Kai Loop backend — SecondCrop, ScrapSense, and Second Serve.
 
 Endpoints:
-    POST /grade   — upload a produce photo, get back grade + route + score
-    GET  /impact  — aggregate stats across everything graded so far
-    GET  /health  — quick liveness check
+    POST /grade               — produce photo -> grade + route + score
+    GET  /impact               — SecondCrop aggregate stats
+    POST /scrapsense/log        — plate photo -> waste level
+    GET  /scrapsense/report      — per-dish flagging report
+    POST /secondserve/scan        — inventory item -> urgency + route
+    GET  /secondserve/report       — near-expiry inventory report
+    GET  /health                    — quick liveness check
 """
+
+from datetime import date, datetime
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -13,12 +19,15 @@ from fastapi.middleware.cors import CORSMiddleware
 from db import (
     get_impact_summary,
     get_scrapsense_report,
+    get_secondserve_report,
     init_db,
     log_grading,
     log_scrapsense,
+    log_secondserve,
 )
 from model_loader import grade_image
 from scrapsense import analyze_plate
+from second_serve import classify_item
 
 app = FastAPI(title="Kai Loop — SecondCrop API")
 
@@ -101,3 +110,39 @@ async def scrapsense_log(dish_id: str = Form(...), file: UploadFile = File(...))
 @app.get("/scrapsense/report")
 def scrapsense_report():
     return {"dishes": get_scrapsense_report()}
+
+
+@app.post("/secondserve/scan")
+def secondserve_scan(
+    name: str = Form(...),
+    expiry_date: str = Form(...),  # YYYY-MM-DD
+    quantity: int = Form(...),
+    unit_price: float = Form(...),
+    sku: str = Form(""),
+):
+    try:
+        expiry = datetime.strptime(expiry_date, "%Y-%m-%d").date()
+    except ValueError:
+        raise HTTPException(status_code=400, detail="expiry_date must be YYYY-MM-DD")
+
+    if quantity < 0 or unit_price < 0:
+        raise HTTPException(status_code=400, detail="quantity and unit_price must be >= 0")
+
+    result = classify_item(expiry, today=date.today())
+    log_secondserve(
+        sku=sku,
+        name=name,
+        expiry_date=expiry_date,
+        quantity=quantity,
+        unit_price=unit_price,
+        days_left=result["days_left"],
+        urgency=result["urgency"],
+        route=result["route"],
+        suggested_markdown_pct=result["suggested_markdown_pct"],
+    )
+    return {"sku": sku, "name": name, **result}
+
+
+@app.get("/secondserve/report")
+def secondserve_report():
+    return get_secondserve_report()

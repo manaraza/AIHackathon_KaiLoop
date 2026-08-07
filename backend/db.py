@@ -50,6 +50,23 @@ def init_db():
             )
             """
         )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS secondserve_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp TEXT NOT NULL,
+                sku TEXT,
+                name TEXT NOT NULL,
+                expiry_date TEXT NOT NULL,
+                quantity INTEGER NOT NULL,
+                unit_price REAL NOT NULL,
+                days_left INTEGER NOT NULL,
+                urgency TEXT NOT NULL,
+                route TEXT NOT NULL,
+                suggested_markdown_pct INTEGER NOT NULL
+            )
+            """
+        )
         conn.commit()
 
 
@@ -134,3 +151,79 @@ def get_scrapsense_report() -> list[dict]:
             }
         )
     return report
+
+
+def log_secondserve(
+    sku: str,
+    name: str,
+    expiry_date: str,
+    quantity: int,
+    unit_price: float,
+    days_left: int,
+    urgency: str,
+    route: str,
+    suggested_markdown_pct: int,
+) -> None:
+    with get_conn() as conn:
+        conn.execute(
+            """
+            INSERT INTO secondserve_logs
+                (timestamp, sku, name, expiry_date, quantity, unit_price,
+                 days_left, urgency, route, suggested_markdown_pct)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                datetime.now(timezone.utc).isoformat(),
+                sku,
+                name,
+                expiry_date,
+                quantity,
+                unit_price,
+                days_left,
+                urgency,
+                route,
+                suggested_markdown_pct,
+            ),
+        )
+        conn.commit()
+
+
+def get_secondserve_report() -> dict:
+    with get_conn() as conn:
+        rows = conn.execute(
+            """
+            SELECT id, sku, name, expiry_date, quantity, unit_price,
+                   days_left, urgency, route, suggested_markdown_pct
+            FROM secondserve_logs
+            ORDER BY days_left ASC
+            """
+        ).fetchall()
+
+    items = []
+    value_at_risk = 0.0
+    counts = {"expired": 0, "urgent": 0, "near_expiry": 0, "watch": 0, "ok": 0}
+    for row in rows:
+        (_id, sku, name, expiry_date, quantity, unit_price,
+         days_left, urgency, route, markdown_pct) = row
+        items.append(
+            {
+                "sku": sku,
+                "name": name,
+                "expiry_date": expiry_date,
+                "quantity": quantity,
+                "unit_price": unit_price,
+                "days_left": days_left,
+                "urgency": urgency,
+                "route": route,
+                "suggested_markdown_pct": markdown_pct,
+            }
+        )
+        counts[urgency] = counts.get(urgency, 0) + 1
+        if urgency in ("expired", "urgent", "near_expiry"):
+            value_at_risk += quantity * unit_price
+
+    return {
+        "items": items,
+        "counts_by_urgency": counts,
+        "estimated_value_at_risk": round(value_at_risk, 2),
+    }

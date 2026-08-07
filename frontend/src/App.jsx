@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import ScrapSense from "./ScrapSense.jsx";
+import SecondServe from "./SecondServe.jsx";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
@@ -121,6 +122,7 @@ function ImpactDashboard({ refreshKey }) {
 const TABS = [
   { id: "secondcrop", label: "SecondCrop" },
   { id: "scrapsense", label: "ScrapSense" },
+  { id: "secondserve", label: "Second Serve" },
 ];
 
 export default function App() {
@@ -154,6 +156,7 @@ export default function App() {
           </>
         )}
         {activeTab === "scrapsense" && <ScrapSense />}
+        {activeTab === "secondserve" && <SecondServe />}
       </main>
     </div>
   );
