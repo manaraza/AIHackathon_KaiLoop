@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import ScrapSense from "./ScrapSense.jsx";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
@@ -117,18 +118,42 @@ function ImpactDashboard({ refreshKey }) {
   );
 }
 
+const TABS = [
+  { id: "secondcrop", label: "SecondCrop" },
+  { id: "scrapsense", label: "ScrapSense" },
+];
+
 export default function App() {
   const [refreshKey, setRefreshKey] = useState(0);
+  const [activeTab, setActiveTab] = useState("secondcrop");
 
   return (
     <div className="app">
       <header>
-        <h1>Kai Loop — SecondCrop</h1>
-        <p className="tagline">Grade produce photos, route surplus before it becomes waste.</p>
+        <h1>Kai Loop</h1>
+        <p className="tagline">Catching food waste at every stage before it becomes waste.</p>
       </header>
+
+      <nav className="tabs">
+        {TABS.map((tab) => (
+          <button
+            key={tab.id}
+            className={`tab-button ${activeTab === tab.id ? "active" : ""}`}
+            onClick={() => setActiveTab(tab.id)}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </nav>
+
       <main>
-        <UploadPanel onGraded={() => setRefreshKey((k) => k + 1)} />
-        <ImpactDashboard refreshKey={refreshKey} />
+        {activeTab === "secondcrop" && (
+          <>
+            <UploadPanel onGraded={() => setRefreshKey((k) => k + 1)} />
+            <ImpactDashboard refreshKey={refreshKey} />
+          </>
+        )}
+        {activeTab === "scrapsense" && <ScrapSense />}
       </main>
     </div>
   );

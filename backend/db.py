@@ -38,6 +38,18 @@ def init_db():
             )
             """
         )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS scrapsense_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp TEXT NOT NULL,
+                dish_id TEXT NOT NULL,
+                filename TEXT,
+                waste_ratio REAL NOT NULL,
+                waste_level TEXT NOT NULL
+            )
+            """
+        )
         conn.commit()
 
 
@@ -77,3 +89,48 @@ def get_impact_summary() -> dict:
             "rescue": rescue_kg,
         },
     }
+
+
+def log_scrapsense(dish_id: str, filename: str, waste_ratio: float, waste_level: str) -> None:
+    with get_conn() as conn:
+        conn.execute(
+            "INSERT INTO scrapsense_logs (timestamp, dish_id, filename, waste_ratio, waste_level) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (datetime.now(timezone.utc).isoformat(), dish_id, filename, waste_ratio, waste_level),
+        )
+        conn.commit()
+
+
+def get_scrapsense_report() -> list[dict]:
+    from scrapsense import (
+        FLAG_AVG_RATIO_THRESHOLD,
+        MIN_SAMPLES_TO_FLAG,
+        suggested_portion_cut_pct,
+    )
+
+    with get_conn() as conn:
+        rows = conn.execute(
+            """
+            SELECT dish_id, COUNT(*), AVG(waste_ratio),
+                   SUM(CASE WHEN waste_level = 'high_leftover' THEN 1 ELSE 0 END)
+            FROM scrapsense_logs
+            GROUP BY dish_id
+            ORDER BY AVG(waste_ratio) DESC
+            """
+        ).fetchall()
+
+    report = []
+    for dish_id, count, avg_ratio, high_count in rows:
+        avg_ratio = round(avg_ratio, 4)
+        flagged = count >= MIN_SAMPLES_TO_FLAG and avg_ratio >= FLAG_AVG_RATIO_THRESHOLD
+        report.append(
+            {
+                "dish_id": dish_id,
+                "plates_logged": count,
+                "avg_waste_ratio": avg_ratio,
+                "high_leftover_count": high_count,
+                "flagged_over_portioned": flagged,
+                "suggested_portion_cut_pct": suggested_portion_cut_pct(avg_ratio) if flagged else 0,
+            }
+        )
+    return report
