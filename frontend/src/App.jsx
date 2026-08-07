@@ -1,0 +1,135 @@
+import { useEffect, useState } from "react";
+
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+
+const GRADE_INFO = {
+  A: { label: "Grade A", route: "Retail", color: "#2e7d32" },
+  B: { label: "Grade B", route: "Manual review (Grade B proxy)", color: "#ed6c02" },
+  C: { label: "Grade C", route: "Rescue → KiwiHarvest", color: "#c62828" },
+};
+
+function GradeBadge({ grade }) {
+  const info = GRADE_INFO[grade] ?? { label: grade, route: "Unknown", color: "#555" };
+  return (
+    <span className="grade-badge" style={{ backgroundColor: info.color }}>
+      {info.label}
+    </span>
+  );
+}
+
+function UploadPanel({ onGraded }) {
+  const [file, setFile] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [result, setResult] = useState(null);
+
+  function handleFileChange(e) {
+    const selected = e.target.files?.[0];
+    if (!selected) return;
+    setFile(selected);
+    setResult(null);
+    setError(null);
+    setPreviewUrl(URL.createObjectURL(selected));
+  }
+
+  async function handleSubmit() {
+    if (!file) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch(`${API_URL}/grade`, { method: "POST", body: formData });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.detail || `Request failed (${res.status})`);
+      }
+      const data = await res.json();
+      setResult(data);
+      onGraded?.();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <section className="panel">
+      <h2>Grade a produce photo</h2>
+      <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handleFileChange} />
+
+      {previewUrl && (
+        <img src={previewUrl} alt="Selected produce" className="preview" />
+      )}
+
+      <button onClick={handleSubmit} disabled={!file || loading}>
+        {loading ? "Grading…" : "Grade this produce"}
+      </button>
+
+      {error && <p className="error">{error}</p>}
+
+      {result && (
+        <div className="result-card">
+          <GradeBadge grade={result.grade} />
+          <p className="route">{GRADE_INFO[result.grade]?.route}</p>
+          <p className="score">Confidence score: {result.score}</p>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function ImpactDashboard({ refreshKey }) {
+  const [impact, setImpact] = useState(null);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    fetch(`${API_URL}/impact`)
+      .then((res) => {
+        if (!res.ok) throw new Error(`Request failed (${res.status})`);
+        return res.json();
+      })
+      .then(setImpact)
+      .catch((err) => setError(err.message));
+  }, [refreshKey]);
+
+  return (
+    <section className="panel">
+      <h2>Impact dashboard</h2>
+      {error && <p className="error">Couldn't load impact stats: {error}</p>}
+      {!impact && !error && <p>Loading…</p>}
+      {impact && (
+        <>
+          <p className="big-stat">{impact.total_items_graded} items graded</p>
+          <p className="big-stat">
+            {impact.estimated_kg_diverted_from_landfill} kg diverted from landfill
+          </p>
+          <ul className="breakdown">
+            <li>Grade A (retail): {impact.counts_by_grade.A}</li>
+            <li>Grade B (review): {impact.counts_by_grade.B}</li>
+            <li>Grade C (rescue): {impact.counts_by_grade.C}</li>
+          </ul>
+        </>
+      )}
+    </section>
+  );
+}
+
+export default function App() {
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  return (
+    <div className="app">
+      <header>
+        <h1>Kai Loop — SecondCrop</h1>
+        <p className="tagline">Grade produce photos, route surplus before it becomes waste.</p>
+      </header>
+      <main>
+        <UploadPanel onGraded={() => setRefreshKey((k) => k + 1)} />
+        <ImpactDashboard refreshKey={refreshKey} />
+      </main>
+    </div>
+  );
+}
