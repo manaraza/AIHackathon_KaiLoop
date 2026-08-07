@@ -1,6 +1,7 @@
 # Kai Loop — SecondCrop MVP
 
-AI food-waste tool for the Aotearoa AI Hackathon.
+The food waste problem we're tackling spans the whole supply chain. Our AI solution, Kai Loop, is a three-module platform for the Aotearoa AI Hackathon.
+
 SecondCrop grades produce photos and routes each grade to
 retail, processing, or rescue (KiwiHarvest).
 
