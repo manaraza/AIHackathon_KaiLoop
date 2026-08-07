@@ -13,7 +13,11 @@ dist/
 data/
 *.h5
 *.keras
+!model/secondcrop_model.keras
 model/saved_model/
+
+# Backend runtime data
+backend/*.db
 
 # OS / editor
 .DS_Store
