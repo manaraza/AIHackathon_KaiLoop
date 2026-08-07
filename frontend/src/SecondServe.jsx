@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { IconClock, IconSparkles } from "./icons.jsx";
+import { StatCard, Spinner } from "./ui.jsx";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
@@ -12,10 +14,10 @@ const URGENCY_LABELS = {
 
 const URGENCY_COLORS = {
   expired: "#8e0000",
-  urgent: "#c62828",
-  near_expiry: "#ed6c02",
-  watch: "#f9a825",
-  ok: "#2e7d32",
+  urgent: "#d0342c",
+  near_expiry: "#d97706",
+  watch: "#c9a400",
+  ok: "#1f8a4c",
 };
 
 function emptyForm() {
@@ -59,7 +61,12 @@ function ScanForm({ onScanned }) {
 
   return (
     <section className="panel">
-      <h2>Scan an inventory item</h2>
+      <div className="panel-head">
+        <span className="panel-icon">
+          <IconClock />
+        </span>
+        <h2>Scan an inventory item</h2>
+      </div>
       <form onSubmit={handleSubmit} className="stack-form">
         <input
           type="text"
@@ -102,6 +109,7 @@ function ScanForm({ onScanned }) {
           className="text-input"
         />
         <button type="submit" disabled={!canSubmit || loading}>
+          {loading && <Spinner />}
           {loading ? "Scanning…" : "Scan item"}
         </button>
       </form>
@@ -111,6 +119,7 @@ function ScanForm({ onScanned }) {
       {result && (
         <div className="result-card">
           <span className="grade-badge" style={{ backgroundColor: URGENCY_COLORS[result.urgency] }}>
+            <IconSparkles width={14} height={14} />
             {URGENCY_LABELS[result.urgency] ?? result.urgency}
           </span>
           <p className="route">
@@ -144,17 +153,18 @@ function SecondServeReport({ refreshKey }) {
     <section className="panel">
       <h2>Inventory report</h2>
       {error && <p className="error">Couldn't load report: {error}</p>}
-      {!report && !error && <p>Loading…</p>}
+      {!report && !error && <p className="empty-state">Loading…</p>}
       {report && (
         <>
-          <p className="big-stat">${report.estimated_value_at_risk} at risk</p>
-          <ul className="breakdown">
-            <li>Expired: {report.counts_by_urgency.expired}</li>
-            <li>Urgent (rescue): {report.counts_by_urgency.urgent}</li>
-            <li>Near expiry (markdown): {report.counts_by_urgency.near_expiry}</li>
-            <li>Watch: {report.counts_by_urgency.watch}</li>
-            <li>OK: {report.counts_by_urgency.ok}</li>
-          </ul>
+          <div className="stat-grid">
+            <StatCard label="Value at risk" value={`$${report.estimated_value_at_risk}`} accent="#d0342c" />
+            <StatCard label="Urgent (rescue)" value={report.counts_by_urgency.urgent} accent="#d0342c" />
+            <StatCard label="Near expiry" value={report.counts_by_urgency.near_expiry} accent="#d97706" />
+            <StatCard label="Watch" value={report.counts_by_urgency.watch} accent="#c9a400" />
+            <StatCard label="OK" value={report.counts_by_urgency.ok} accent="#1f8a4c" />
+          </div>
+
+          {report.items.length === 0 && <p className="empty-state">No items scanned yet.</p>}
 
           {report.items.length > 0 && (
             <table className="report-table">
@@ -176,7 +186,17 @@ function SecondServeReport({ refreshKey }) {
                     <td>{item.name}</td>
                     <td>{item.quantity}</td>
                     <td>{item.days_left}</td>
-                    <td>{URGENCY_LABELS[item.urgency] ?? item.urgency}</td>
+                    <td>
+                      <span
+                        className="pill"
+                        style={{
+                          background: `${URGENCY_COLORS[item.urgency]}1a`,
+                          color: URGENCY_COLORS[item.urgency],
+                        }}
+                      >
+                        {URGENCY_LABELS[item.urgency] ?? item.urgency}
+                      </span>
+                    </td>
                     <td>
                       {item.route === "rescue"
                         ? "Rescue → KiwiHarvest"
@@ -203,10 +223,13 @@ export default function SecondServe() {
   return (
     <div>
       <p className="module-note">
-        Mocked module: rule-based on expiry date, no photo or trained model
-        needed — this is close to how a production version would work too.
-        ≤1 day left → rescue via KiwiHarvest. 2-3 days → markdown suggestion.
-        4-7 days → watch list.
+        <IconSparkles width={16} height={16} style={{ flexShrink: 0, marginTop: "0.1rem" }} />
+        <span>
+          Mocked module: rule-based on expiry date, no photo or trained model
+          needed — this is close to how a production version would work too.
+          ≤1 day left → rescue via KiwiHarvest. 2-3 days → markdown suggestion.
+          4-7 days → watch list.
+        </span>
       </p>
       <ScanForm onScanned={() => setRefreshKey((k) => k + 1)} />
       <SecondServeReport refreshKey={refreshKey} />

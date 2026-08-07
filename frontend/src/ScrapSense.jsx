@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { IconPlate, IconUpload, IconSparkles } from "./icons.jsx";
+import { MiniBar, Spinner } from "./ui.jsx";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
@@ -6,6 +8,12 @@ const LEVEL_LABELS = {
   clean_plate: "Clean plate",
   partial_leftover: "Partial leftover",
   high_leftover: "High leftover",
+};
+
+const LEVEL_COLORS = {
+  clean_plate: "#1f8a4c",
+  partial_leftover: "#d97706",
+  high_leftover: "#d0342c",
 };
 
 function PlateUpload({ onLogged }) {
@@ -50,7 +58,13 @@ function PlateUpload({ onLogged }) {
 
   return (
     <section className="panel">
-      <h2>Log a plate photo</h2>
+      <div className="panel-head">
+        <span className="panel-icon">
+          <IconPlate />
+        </span>
+        <h2>Log a plate photo</h2>
+      </div>
+
       <input
         type="text"
         placeholder="Dish name (e.g. lasagna)"
@@ -58,11 +72,17 @@ function PlateUpload({ onLogged }) {
         onChange={(e) => setDishId(e.target.value)}
         className="text-input"
       />
-      <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handleFileChange} />
+
+      <label className="file-drop">
+        <IconUpload width={18} height={18} />
+        {file ? file.name : "Choose a plate photo"}
+        <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handleFileChange} />
+      </label>
 
       {previewUrl && <img src={previewUrl} alt="Plate" className="preview" />}
 
       <button onClick={handleSubmit} disabled={!file || !dishId.trim() || loading}>
+        {loading && <Spinner />}
         {loading ? "Analyzing…" : "Log this plate"}
       </button>
 
@@ -70,8 +90,13 @@ function PlateUpload({ onLogged }) {
 
       {result && (
         <div className="result-card">
-          <p className="route">{LEVEL_LABELS[result.waste_level] ?? result.waste_level}</p>
-          <p className="score">Waste ratio: {result.waste_ratio}</p>
+          <span className="grade-badge" style={{ backgroundColor: LEVEL_COLORS[result.waste_level] }}>
+            <IconSparkles width={14} height={14} />
+            {LEVEL_LABELS[result.waste_level] ?? result.waste_level}
+          </span>
+          <p className="score" style={{ marginTop: "0.6rem" }}>
+            Waste ratio: {Math.round(result.waste_ratio * 100)}%
+          </p>
         </div>
       )}
     </section>
@@ -96,8 +121,8 @@ function ScrapSenseReport({ refreshKey }) {
     <section className="panel">
       <h2>Dish report</h2>
       {error && <p className="error">Couldn't load report: {error}</p>}
-      {!dishes && !error && <p>Loading…</p>}
-      {dishes && dishes.length === 0 && <p>No plates logged yet.</p>}
+      {!dishes && !error && <p className="empty-state">Loading…</p>}
+      {dishes && dishes.length === 0 && <p className="empty-state">No plates logged yet.</p>}
       {dishes && dishes.length > 0 && (
         <table className="report-table">
           <thead>
@@ -105,7 +130,7 @@ function ScrapSenseReport({ refreshKey }) {
               <th>Dish</th>
               <th>Plates</th>
               <th>Avg waste</th>
-              <th>Flagged</th>
+              <th>Status</th>
               <th>Suggested cut</th>
             </tr>
           </thead>
@@ -114,8 +139,24 @@ function ScrapSenseReport({ refreshKey }) {
               <tr key={d.dish_id} className={d.flagged_over_portioned ? "flagged-row" : ""}>
                 <td>{d.dish_id}</td>
                 <td>{d.plates_logged}</td>
-                <td>{Math.round(d.avg_waste_ratio * 100)}%</td>
-                <td>{d.flagged_over_portioned ? "Over-portioned" : "—"}</td>
+                <td>
+                  <MiniBar
+                    pct={d.avg_waste_ratio * 100}
+                    color={d.flagged_over_portioned ? "#d0342c" : "#1f8a4c"}
+                  />{" "}
+                  {Math.round(d.avg_waste_ratio * 100)}%
+                </td>
+                <td>
+                  {d.flagged_over_portioned ? (
+                    <span className="pill" style={{ background: "#fde8e6", color: "#d0342c" }}>
+                      Over-portioned
+                    </span>
+                  ) : (
+                    <span className="pill" style={{ background: "#e3f5e8", color: "#1f8a4c" }}>
+                      OK
+                    </span>
+                  )}
+                </td>
                 <td>{d.flagged_over_portioned ? `-${d.suggested_portion_cut_pct}%` : "—"}</td>
               </tr>
             ))}
@@ -132,9 +173,12 @@ export default function ScrapSense() {
   return (
     <div>
       <p className="module-note">
-        Mocked module: a saturation-based heuristic estimates leftover food on
-        each plate (no trained model yet). A dish is flagged once 3+ plates
-        average 35%+ waste.
+        <IconSparkles width={16} height={16} style={{ flexShrink: 0, marginTop: "0.1rem" }} />
+        <span>
+          Mocked module: a saturation-based heuristic estimates leftover food on
+          each plate (no trained model yet). A dish is flagged once 3+ plates
+          average 35%+ waste.
+        </span>
       </p>
       <PlateUpload onLogged={() => setRefreshKey((k) => k + 1)} />
       <ScrapSenseReport refreshKey={refreshKey} />

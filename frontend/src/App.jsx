@@ -1,19 +1,22 @@
 import { useEffect, useState } from "react";
 import ScrapSense from "./ScrapSense.jsx";
 import SecondServe from "./SecondServe.jsx";
+import { IconLeaf, IconPlate, IconClock, IconUpload, IconSparkles, IconRecycle } from "./icons.jsx";
+import { StatCard, Spinner } from "./ui.jsx";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
 const GRADE_INFO = {
-  A: { label: "Grade A", route: "Retail", color: "#2e7d32" },
-  B: { label: "Grade B", route: "Manual review (Grade B proxy)", color: "#ed6c02" },
-  C: { label: "Grade C", route: "Rescue → KiwiHarvest", color: "#c62828" },
+  A: { label: "Grade A", route: "Retail", color: "#1f8a4c" },
+  B: { label: "Grade B", route: "Manual review (Grade B proxy)", color: "#d97706" },
+  C: { label: "Grade C", route: "Rescue → KiwiHarvest", color: "#d0342c" },
 };
 
 function GradeBadge({ grade }) {
   const info = GRADE_INFO[grade] ?? { label: grade, route: "Unknown", color: "#555" };
   return (
     <span className="grade-badge" style={{ backgroundColor: info.color }}>
+      <IconSparkles width={14} height={14} />
       {info.label}
     </span>
   );
@@ -59,14 +62,23 @@ function UploadPanel({ onGraded }) {
 
   return (
     <section className="panel">
-      <h2>Grade a produce photo</h2>
-      <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handleFileChange} />
+      <div className="panel-head">
+        <span className="panel-icon">
+          <IconLeaf />
+        </span>
+        <h2>Grade a produce photo</h2>
+      </div>
 
-      {previewUrl && (
-        <img src={previewUrl} alt="Selected produce" className="preview" />
-      )}
+      <label className="file-drop">
+        <IconUpload width={18} height={18} />
+        {file ? file.name : "Choose a photo to grade"}
+        <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handleFileChange} />
+      </label>
+
+      {previewUrl && <img src={previewUrl} alt="Selected produce" className="preview" />}
 
       <button onClick={handleSubmit} disabled={!file || loading}>
+        {loading && <Spinner />}
         {loading ? "Grading…" : "Grade this produce"}
       </button>
 
@@ -99,30 +111,35 @@ function ImpactDashboard({ refreshKey }) {
 
   return (
     <section className="panel">
-      <h2>Impact dashboard</h2>
+      <div className="panel-head">
+        <span className="panel-icon">
+          <IconRecycle />
+        </span>
+        <h2>Impact dashboard</h2>
+      </div>
       {error && <p className="error">Couldn't load impact stats: {error}</p>}
-      {!impact && !error && <p>Loading…</p>}
+      {!impact && !error && <p className="empty-state">Loading…</p>}
       {impact && (
-        <>
-          <p className="big-stat">{impact.total_items_graded} items graded</p>
-          <p className="big-stat">
-            {impact.estimated_kg_diverted_from_landfill} kg diverted from landfill
-          </p>
-          <ul className="breakdown">
-            <li>Grade A (retail): {impact.counts_by_grade.A}</li>
-            <li>Grade B (review): {impact.counts_by_grade.B}</li>
-            <li>Grade C (rescue): {impact.counts_by_grade.C}</li>
-          </ul>
-        </>
+        <div className="stat-grid">
+          <StatCard label="Items graded" value={impact.total_items_graded} accent="#1f8a4c" />
+          <StatCard
+            label="kg diverted from landfill"
+            value={impact.estimated_kg_diverted_from_landfill}
+            accent="#166a3a"
+          />
+          <StatCard label="Grade A → retail" value={impact.counts_by_grade.A} accent="#1f8a4c" />
+          <StatCard label="Grade B → review" value={impact.counts_by_grade.B} accent="#d97706" />
+          <StatCard label="Grade C → rescue" value={impact.counts_by_grade.C} accent="#d0342c" />
+        </div>
       )}
     </section>
   );
 }
 
 const TABS = [
-  { id: "secondcrop", label: "SecondCrop" },
-  { id: "scrapsense", label: "ScrapSense" },
-  { id: "secondserve", label: "Second Serve" },
+  { id: "secondcrop", label: "SecondCrop", icon: IconLeaf },
+  { id: "scrapsense", label: "ScrapSense", icon: IconPlate },
+  { id: "secondserve", label: "Second Serve", icon: IconClock },
 ];
 
 export default function App() {
@@ -131,33 +148,47 @@ export default function App() {
 
   return (
     <div className="app">
-      <header>
-        <h1>Kai Loop</h1>
-        <p className="tagline">Catching food waste at every stage before it becomes waste.</p>
-      </header>
+      <div className="hero">
+        <div className="hero-inner">
+          <span className="hero-badge">
+            <IconSparkles width={14} height={14} />
+            Aotearoa AI Hackathon
+          </span>
+          <h1>Kai Loop</h1>
+          <p className="tagline">
+            Catching food waste at every stage of the supply chain — before it becomes waste.
+          </p>
+        </div>
+      </div>
 
-      <nav className="tabs">
-        {TABS.map((tab) => (
-          <button
-            key={tab.id}
-            className={`tab-button ${activeTab === tab.id ? "active" : ""}`}
-            onClick={() => setActiveTab(tab.id)}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </nav>
+      <div className="content">
+        <nav className="tabs">
+          {TABS.map((tab) => {
+            const Icon = tab.icon;
+            return (
+              <button
+                key={tab.id}
+                className={`tab-button ${activeTab === tab.id ? "active" : ""}`}
+                onClick={() => setActiveTab(tab.id)}
+              >
+                <Icon width={16} height={16} />
+                {tab.label}
+              </button>
+            );
+          })}
+        </nav>
 
-      <main>
-        {activeTab === "secondcrop" && (
-          <>
-            <UploadPanel onGraded={() => setRefreshKey((k) => k + 1)} />
-            <ImpactDashboard refreshKey={refreshKey} />
-          </>
-        )}
-        {activeTab === "scrapsense" && <ScrapSense />}
-        {activeTab === "secondserve" && <SecondServe />}
-      </main>
+        <main>
+          {activeTab === "secondcrop" && (
+            <>
+              <UploadPanel onGraded={() => setRefreshKey((k) => k + 1)} />
+              <ImpactDashboard refreshKey={refreshKey} />
+            </>
+          )}
+          {activeTab === "scrapsense" && <ScrapSense />}
+          {activeTab === "secondserve" && <SecondServe />}
+        </main>
+      </div>
     </div>
   );
 }
