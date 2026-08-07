@@ -91,7 +91,11 @@ def get_impact_summary() -> dict:
     for grade, count in rows:
         counts[grade] = count
 
-    total_kg = round(total * AVG_ITEM_WEIGHT_KG, 2)
+    # Grade A was always headed to retail -- it was never at risk of
+    # landfill, so it doesn't count toward "diverted." Only B (processing
+    # review) and C (rescue) are produce that would otherwise likely have
+    # been binned; catching and rerouting those is the actual waste-saved.
+    diverted_kg = round((counts["B"] + counts["C"]) * AVG_ITEM_WEIGHT_KG, 2)
     retail_kg = round(counts["A"] * AVG_ITEM_WEIGHT_KG, 2)
     review_kg = round(counts["B"] * AVG_ITEM_WEIGHT_KG, 2)
     rescue_kg = round(counts["C"] * AVG_ITEM_WEIGHT_KG, 2)
@@ -99,7 +103,7 @@ def get_impact_summary() -> dict:
     return {
         "total_items_graded": total,
         "counts_by_grade": counts,
-        "estimated_kg_diverted_from_landfill": total_kg,
+        "estimated_kg_diverted_from_landfill": diverted_kg,
         "breakdown_kg": {
             "retail": retail_kg,
             "processing_review": review_kg,
