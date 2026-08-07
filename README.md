@@ -12,5 +12,8 @@ retail, processing, or rescue (KiwiHarvest).
 - data/     — produce images (gitignored)
 
 ## Team
-- Samana — backend + model
-- Hetvi  — frontend + mocked screens
+- Samana 
+- Hetvi
+- Sreenath
+- Priya
+- Nikithaa
