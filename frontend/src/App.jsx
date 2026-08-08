@@ -3,6 +3,7 @@ import ScrapSense from "./ScrapSense.jsx";
 import SecondServe from "./SecondServe.jsx";
 import { IconLeaf, IconPlate, IconClock, IconUpload, IconSparkles, IconRecycle } from "./icons.jsx";
 import { StatCard, Spinner } from "./ui.jsx";
+import logo from "./assets/logo.png";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
@@ -237,6 +238,7 @@ export default function App() {
     <div className="app">
       <div className="hero">
         <div className="hero-inner">
+          <img src={logo} alt="Kai Loop logo" className="hero-logo" />
           <span className="hero-badge">
             <IconSparkles width={14} height={14} />
             Aotearoa AI Hackathon

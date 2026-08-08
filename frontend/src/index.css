@@ -72,6 +72,18 @@ h1, h2, h3 {
   text-align: center;
 }
 
+.hero-logo {
+  display: block;
+  width: 84px;
+  height: 84px;
+  object-fit: cover;
+  border-radius: 50%;
+  border: 3px solid rgba(255, 255, 255, 0.55);
+  box-shadow: var(--shadow-lg);
+  margin: 0 auto 1rem;
+  background: #fdf6ec;
+}
+
 .hero-badge {
   display: inline-flex;
   align-items: center;
