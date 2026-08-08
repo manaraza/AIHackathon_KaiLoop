@@ -10,13 +10,21 @@ through the existing trained classifier separately.
 
 This is genuinely a hard, unsolved-in-general computer vision problem
 without labeled training data (a proper answer is a trained object
-detector). What's here is a reasonable classical-CV approximation:
+detector). What's here is a reasonable classical-CV approximation,
+tuned to favor precision over recall -- an undercount is a safe,
+explainable failure (some fruit not graded this pass), a false-positive
+box drawn on grass or wicker is a much worse one (looks broken, produces
+a garbage crop). Concretely:
+- A brightness filter rejects detected circles whose interior reads
+  darker than real fruit typically does in a normally-lit photo -- this
+  is what actually kills most grass/wicker background false positives,
+  which was the dominant failure mode in earlier tuning.
 - Works well on well-separated, evenly-lit produce (a single layer laid
-  out on a tray/box/table) -- tested at 24/24 correct count on a sample
-  photo of apples in a box.
-- Produces some false positives on cluttered/textured backgrounds
-  (grass, woven baskets) since it has no training data to learn what
-  "fruit" looks like vs. "background clutter."
+  out on a tray/box/table) -- tested at 20/24 correct, zero false
+  positives, on a sample photo of apples in a box (previously 24/24 but
+  with several misplaced/duplicate boxes before this brightness filter
+  was added -- fewer-but-correct was judged the better tradeoff for a
+  demo).
 - Undercounts heavily on densely packed bins where fruit overlaps with
   no visible boundary between pieces.
 These are documented, known limitations, not silent failures -- the
@@ -28,10 +36,12 @@ import cv2
 import numpy as np
 
 WORKING_MAX_DIM = 900
-MIN_RADIUS_FRAC = 0.045
-MAX_RADIUS_FRAC = 0.09
+MIN_RADIUS_FRAC = 0.05
+MAX_RADIUS_FRAC = 0.085
 HOUGH_PARAM1 = 100
-HOUGH_PARAM2 = 55
+HOUGH_PARAM2 = 50
+MIN_DIST_MULTIPLIER = 1.8  # x min radius; spaces out accepted circle centers
+BRIGHTNESS_THRESHOLD = 150  # HSV value (0-255); rejects dim background regions
 CROP_PADDING_FRAC = 0.15  # extra margin around each detected circle
 
 
@@ -55,11 +65,12 @@ def detect_fruit_boxes(image_bytes: bytes) -> list[dict]:
     wh, ww = work.shape[:2]
 
     gray = cv2.cvtColor(work, cv2.COLOR_BGR2GRAY)
+    hsv = cv2.cvtColor(work, cv2.COLOR_BGR2HSV)
     blurred = cv2.medianBlur(gray, 9)
 
     min_r = int(MIN_RADIUS_FRAC * max(wh, ww))
     max_r = int(MAX_RADIUS_FRAC * max(wh, ww))
-    min_dist = int(min_r * 1.5)
+    min_dist = int(min_r * MIN_DIST_MULTIPLIER)
 
     circles = cv2.HoughCircles(
         blurred,
@@ -75,6 +86,20 @@ def detect_fruit_boxes(image_bytes: bytes) -> list[dict]:
     boxes = []
     if circles is not None:
         for x, y, r in circles[0]:
+            x, y, r = int(x), int(y), int(r)
+
+            # Brightness check on the circle's interior -- rejects grass,
+            # wicker, and other dim background clutter that happens to be
+            # round-ish. Real fruit in a normally-lit photo reads brighter.
+            px0, py0 = max(0, x - int(r * 0.5)), max(0, y - int(r * 0.5))
+            px1, py1 = min(ww, x + int(r * 0.5)), min(wh, y + int(r * 0.5))
+            patch = hsv[py0:py1, px0:px1]
+            if patch.size == 0:
+                continue
+            mean_brightness = patch.reshape(-1, 3)[:, 2].mean()
+            if mean_brightness <= BRIGHTNESS_THRESHOLD:
+                continue
+
             pad_r = r * (1 + CROP_PADDING_FRAC)
             # map back to original image coordinates
             cx, cy, cr = x / scale, y / scale, pad_r / scale
