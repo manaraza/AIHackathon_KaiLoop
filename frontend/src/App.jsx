@@ -22,20 +22,61 @@ function GradeBadge({ grade }) {
   );
 }
 
+function BatchOverlay({ previewUrl, batchResult }) {
+  const { image_width, image_height, items } = batchResult;
+  return (
+    <div className="overlay-frame">
+      <img src={previewUrl} alt="Graded produce" className="overlay-img" />
+      <div className="overlay-boxes">
+        {items.map((item, i) => {
+          const info = GRADE_INFO[item.grade] ?? { color: "#555" };
+          const left = (item.box.x / image_width) * 100;
+          const top = (item.box.y / image_height) * 100;
+          const w = (item.box.w / image_width) * 100;
+          const h = (item.box.h / image_height) * 100;
+          return (
+            <div
+              key={i}
+              className="overlay-box"
+              style={{
+                left: `${left}%`,
+                top: `${top}%`,
+                width: `${w}%`,
+                height: `${h}%`,
+                borderColor: info.color,
+              }}
+            />
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function UploadPanel({ onGraded }) {
+  const [mode, setMode] = useState("single"); // "single" | "batch"
   const [file, setFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [result, setResult] = useState(null);
+  const [batchResult, setBatchResult] = useState(null);
 
   function handleFileChange(e) {
     const selected = e.target.files?.[0];
     if (!selected) return;
     setFile(selected);
     setResult(null);
+    setBatchResult(null);
     setError(null);
     setPreviewUrl(URL.createObjectURL(selected));
+  }
+
+  function handleModeChange(newMode) {
+    setMode(newMode);
+    setResult(null);
+    setBatchResult(null);
+    setError(null);
   }
 
   async function handleSubmit() {
@@ -45,13 +86,18 @@ function UploadPanel({ onGraded }) {
     try {
       const formData = new FormData();
       formData.append("file", file);
-      const res = await fetch(`${API_URL}/grade`, { method: "POST", body: formData });
+      const endpoint = mode === "batch" ? "/grade-batch" : "/grade";
+      const res = await fetch(`${API_URL}${endpoint}`, { method: "POST", body: formData });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         throw new Error(body.detail || `Request failed (${res.status})`);
       }
       const data = await res.json();
-      setResult(data);
+      if (mode === "batch") {
+        setBatchResult(data);
+      } else {
+        setResult(data);
+      }
       onGraded?.();
     } catch (err) {
       setError(err.message);
@@ -69,17 +115,43 @@ function UploadPanel({ onGraded }) {
         <h2>Grade a produce photo</h2>
       </div>
 
+      <div className="mode-toggle">
+        <button
+          type="button"
+          className={`mode-button ${mode === "single" ? "active" : ""}`}
+          onClick={() => handleModeChange("single")}
+        >
+          Single fruit
+        </button>
+        <button
+          type="button"
+          className={`mode-button ${mode === "batch" ? "active" : ""}`}
+          onClick={() => handleModeChange("batch")}
+        >
+          Bunch / crate
+        </button>
+      </div>
+      {mode === "batch" && (
+        <p className="hint-text">
+          Works best on produce laid out in a single layer with some space between
+          pieces (a tray, box, or table). Dense, overlapping piles will undercount.
+        </p>
+      )}
+
       <label className="file-drop">
         <IconUpload width={18} height={18} />
         {file ? file.name : "Choose a photo to grade"}
         <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handleFileChange} />
       </label>
 
-      {previewUrl && <img src={previewUrl} alt="Selected produce" className="preview" />}
+      {previewUrl && !batchResult && (
+        <img src={previewUrl} alt="Selected produce" className="preview" />
+      )}
+      {previewUrl && batchResult && <BatchOverlay previewUrl={previewUrl} batchResult={batchResult} />}
 
       <button onClick={handleSubmit} disabled={!file || loading}>
         {loading && <Spinner />}
-        {loading ? "Grading…" : "Grade this produce"}
+        {loading ? "Grading…" : mode === "batch" ? "Grade this bunch" : "Grade this produce"}
       </button>
 
       {error && <p className="error">{error}</p>}
@@ -89,6 +161,21 @@ function UploadPanel({ onGraded }) {
           <GradeBadge grade={result.grade} />
           <p className="route">{GRADE_INFO[result.grade]?.route}</p>
           <p className="score">Confidence score: {result.score}</p>
+        </div>
+      )}
+
+      {batchResult && (
+        <div className="result-card">
+          <p className="route">
+            {batchResult.detection_mode === "single_fallback"
+              ? "Only one fruit detected — graded as a single item."
+              : `${batchResult.items.length} fruit${batchResult.items.length === 1 ? "" : "s"} detected`}
+          </p>
+          <div className="stat-grid" style={{ marginTop: "0.75rem" }}>
+            <StatCard label="Grade A → retail" value={batchResult.counts_by_grade.A} accent="#1f8a4c" />
+            <StatCard label="Grade B → review" value={batchResult.counts_by_grade.B} accent="#d97706" />
+            <StatCard label="Grade C → rescue" value={batchResult.counts_by_grade.C} accent="#d0342c" />
+          </div>
         </div>
       )}
     </section>
